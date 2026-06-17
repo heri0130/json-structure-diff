@@ -6,14 +6,14 @@ import { generateSpec, type SpecField } from './lib/spec'
 import DiffTree from './components/DiffTree.vue'
 
 type Theme = 'light' | 'dark' | 'princess' | 'prince'
-type View = 'none' | 'diff' | 'spec'
+type Tab = 'diff' | 'spec'
 
 const oldText = ref('')
 const newText = ref('')
 const error = ref('')
 const result = ref<DiffResult | null>(null)
 const specFields = ref<SpecField[]>([])
-const view = ref<View>('none')
+const activeTab = ref<Tab>('diff')
 
 // 테마 — localStorage 에 저장해 새로고침 후에도 유지
 const theme = ref<Theme>('light')
@@ -74,6 +74,7 @@ const totalChanges = computed(() => {
 function compare() {
   error.value = ''
   result.value = null
+  specFields.value = []
 
   const oldParsed = parseJsonInput(oldText.value, '변경 전')
   if (!oldParsed.ok) {
@@ -85,20 +86,10 @@ function compare() {
     error.value = newParsed.message
     return
   }
+  // 비교 결과와 명세서(변경 후 기준)를 함께 만들어, 결과 영역에서 탭으로 전환해 본다.
   result.value = diffJson(oldParsed.value, newParsed.value)
-  view.value = 'diff'
-}
-
-function showSpec() {
-  error.value = ''
-  // 명세서는 "변경 후" JSON 구조를 기준으로 생성한다.
-  const parsed = parseJsonInput(newText.value, '변경 후')
-  if (!parsed.ok) {
-    error.value = parsed.message
-    return
-  }
-  specFields.value = generateSpec(parsed.value)
-  view.value = 'spec'
+  specFields.value = generateSpec(newParsed.value)
+  activeTab.value = 'diff'
 }
 
 function loadSample() {
@@ -106,7 +97,8 @@ function loadSample() {
   newText.value = SAMPLE_NEW
   error.value = ''
   result.value = null
-  view.value = 'none'
+  specFields.value = []
+  activeTab.value = 'diff'
 }
 
 function reset() {
@@ -115,7 +107,7 @@ function reset() {
   error.value = ''
   result.value = null
   specFields.value = []
-  view.value = 'none'
+  activeTab.value = 'diff'
 }
 </script>
 
@@ -208,55 +200,80 @@ function reset() {
               stroke-linejoin="round"
             />
           </svg>
-          비교하기
+          분석하기
         </button>
         <button class="btn ghost" @click="loadSample">예시 넣기</button>
         <button class="btn ghost" @click="reset">초기화</button>
-        <button class="btn outline" @click="showSpec">명세서</button>
       </div>
 
       <p v-if="error" class="error" role="alert"><strong>입력 오류</strong> {{ error }}</p>
 
-      <!-- 비교 결과 -->
-      <section v-if="view === 'diff' && result" class="result">
-        <div class="result-head">
-          <h2>변경 요약</h2>
-          <div class="summary">
-            <span class="chip added">+{{ result.summary.added }} 추가</span>
-            <span class="chip removed">−{{ result.summary.removed }} 삭제</span>
-            <span class="chip changed">~{{ result.summary.changed }} 변경</span>
-          </div>
+      <!-- 결과: 차이 비교 / 명세서 탭 전환 -->
+      <section v-if="result" class="result">
+        <div class="tabs" role="tablist">
+          <button
+            class="tab"
+            role="tab"
+            :class="{ active: activeTab === 'diff' }"
+            @click="activeTab = 'diff'"
+          >
+            변경 사항
+          </button>
+          <button
+            class="tab"
+            role="tab"
+            :class="{ active: activeTab === 'spec' }"
+            @click="activeTab = 'spec'"
+          >
+            명세서
+          </button>
+          <span class="tab-meta">
+            <template v-if="activeTab === 'diff'">
+              <span class="chip added">추가 {{ result.summary.added }}</span>
+              <span class="chip removed">삭제 {{ result.summary.removed }}</span>
+              <span class="chip changed">변경 {{ result.summary.changed }}</span>
+            </template>
+            <template v-else>필드 {{ specFields.length }}개 · 변경 후 기준</template>
+          </span>
         </div>
-        <p v-if="totalChanges === 0" class="no-diff">두 JSON이 동일합니다. 차이가 없어요.</p>
-        <ul v-else class="tree">
-          <DiffTree :node="result.root" />
-        </ul>
-      </section>
 
-      <!-- 명세서 -->
-      <section v-else-if="view === 'spec'" class="result">
-        <div class="result-head">
-          <h2>명세서</h2>
-          <span class="head-note">변경 후 JSON 구조 기준 · 필드 {{ specFields.length }}개</span>
+        <!-- 차이 비교 -->
+        <div v-show="activeTab === 'diff'" class="tab-panel">
+          <p v-if="totalChanges === 0" class="no-diff">두 JSON이 동일합니다. 차이가 없어요.</p>
+          <ul v-else class="tree">
+            <DiffTree :node="result.root" />
+          </ul>
         </div>
-        <p v-if="specFields.length === 0" class="no-diff">표시할 필드가 없습니다.</p>
-        <div v-else class="spec-wrap">
-          <table class="spec">
-            <thead>
-              <tr>
-                <th>필드 경로</th>
-                <th>타입</th>
-                <th>예시값</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="f in specFields" :key="f.path">
-                <td class="spec-path">{{ f.path }}</td>
-                <td><span class="type-chip">{{ f.type }}</span></td>
-                <td class="spec-ex">{{ f.example || '—' }}</td>
-              </tr>
-            </tbody>
-          </table>
+
+        <!-- 명세서 -->
+        <div v-show="activeTab === 'spec'" class="tab-panel">
+          <p v-if="specFields.length === 0" class="no-diff">표시할 필드가 없습니다.</p>
+          <div v-else class="spec-wrap">
+            <table class="spec">
+              <thead>
+                <tr>
+                  <th>필드</th>
+                  <th>타입</th>
+                  <th>예시값</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="f in specFields" :key="f.path" :class="{ 'is-child': f.depth > 0 }">
+                  <td class="spec-path">
+                    <span
+                      class="indent"
+                      :style="{ width: f.depth * 18 + 'px' }"
+                      aria-hidden="true"
+                    ></span>
+                    <span v-if="f.depth > 0" class="branch" aria-hidden="true">└</span>
+                    <span class="field-name">{{ f.name }}</span>
+                  </td>
+                  <td><span class="type-chip">{{ f.type }}</span></td>
+                  <td class="spec-ex">{{ f.example || '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -272,7 +289,7 @@ function reset() {
         </svg>
         <p class="empty-title">아직 결과가 없어요</p>
         <p class="empty-sub">
-          두 JSON을 넣고 <b>비교하기</b>를, 구조 명세가 필요하면 <b>명세서</b>를 눌러 보세요.
+          두 JSON을 넣고 <b>분석하기</b>를 누르면 변경 사항과 명세서를 함께 볼 수 있어요.
           <br />처음이라면 <b>예시 넣기</b>로 시작하면 쉬워요.
         </p>
       </section>
@@ -550,14 +567,6 @@ textarea::placeholder {
   background: var(--surface);
   color: var(--text);
 }
-.btn.outline {
-  background: transparent;
-  border-color: var(--brand);
-  color: var(--brand);
-}
-.btn.outline:hover {
-  background: var(--surface);
-}
 
 /* ── 오류 ── */
 .error {
@@ -583,28 +592,40 @@ textarea::placeholder {
   box-shadow: var(--shadow);
   overflow: hidden;
 }
-.result-head {
+.tabs {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 18px;
+  gap: 4px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
-  flex-wrap: wrap;
 }
-.result-head h2 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
+.tab {
+  border: 0;
+  background: transparent;
+  padding: 7px 14px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: background 0.12s ease, color 0.12s ease;
 }
-.head-note {
+.tab:hover {
+  color: var(--text);
+}
+.tab.active {
+  background: var(--surface);
+  color: var(--brand);
+  box-shadow: var(--shadow-sm);
+}
+.tab-meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
   color: var(--text-muted);
-}
-.summary {
-  display: flex;
-  gap: 8px;
+  padding-right: 6px;
 }
 .chip {
   font-size: 12px;
@@ -670,8 +691,24 @@ textarea::placeholder {
 }
 .spec-path {
   font-family: var(--mono);
+  white-space: nowrap;
+}
+.spec-path .indent {
+  display: inline-block;
+  flex: none;
+}
+.spec-path .branch {
+  color: var(--text-subtle);
+  margin-right: 5px;
+}
+.spec-path .field-name {
   font-weight: 600;
   color: var(--text);
+}
+/* 하위 필드(자식)는 이름을 살짝 옅게 해 부모와 위계 구분 */
+.is-child .field-name {
+  font-weight: 500;
+  color: var(--text-muted);
 }
 .spec-ex {
   font-family: var(--mono);
