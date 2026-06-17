@@ -3,6 +3,7 @@ import { ref, computed, watchEffect } from 'vue'
 import { parseJsonInput } from './lib/parse'
 import { diffJson, type DiffResult } from './lib/diff'
 import { generateSpec, type SpecField } from './lib/spec'
+import { diffToMarkdown, specToMarkdown } from './lib/export'
 import DiffTree from './components/DiffTree.vue'
 
 type Theme = 'light' | 'dark' | 'princess' | 'prince'
@@ -15,6 +16,7 @@ const result = ref<DiffResult | null>(null)
 const specFields = ref<SpecField[]>([])
 const activeTab = ref<Tab>('diff')
 const selectedExample = ref<number | null>(null) // 현재 불러온 예시 칩 강조용
+const copied = ref(false) // 복사 완료 피드백
 
 // 테마 — localStorage 에 저장해 새로고침 후에도 유지
 const theme = ref<Theme>('light')
@@ -182,6 +184,24 @@ function loadSample(index: number) {
   activeTab.value = 'diff'
 }
 
+async function copyResult() {
+  if (!result.value) return
+  // 활성 탭 기준으로 마크다운을 만든다.
+  const md =
+    activeTab.value === 'diff'
+      ? diffToMarkdown(result.value)
+      : specToMarkdown(specFields.value)
+  try {
+    await navigator.clipboard.writeText(md)
+    copied.value = true
+    setTimeout(() => {
+      copied.value = false
+    }, 1500)
+  } catch {
+    error.value = '클립보드 복사에 실패했어요. 브라우저 권한(보안 컨텍스트)을 확인해주세요.'
+  }
+}
+
 function reset() {
   oldText.value = ''
   newText.value = ''
@@ -329,6 +349,14 @@ function reset() {
             </template>
             <template v-else>필드 {{ specFields.length }}개 · 변경 후 기준</template>
           </span>
+          <button
+            class="copy-btn"
+            :class="{ done: copied }"
+            :title="activeTab === 'diff' ? '변경 사항을 마크다운으로 복사' : '명세서를 마크다운으로 복사'"
+            @click="copyResult"
+          >
+            {{ copied ? '✓ 복사됨' : '⧉ 마크다운 복사' }}
+          </button>
         </div>
 
         <!-- 차이 비교 -->
@@ -759,7 +787,28 @@ textarea::placeholder {
   gap: 6px;
   font-size: 12px;
   color: var(--text-muted);
-  padding-right: 6px;
+}
+.copy-btn {
+  align-self: center;
+  margin-left: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.copy-btn:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+.copy-btn.done {
+  border-color: var(--added);
+  color: var(--added);
+  background: var(--added-bg);
 }
 .chip {
   font-size: 12px;
