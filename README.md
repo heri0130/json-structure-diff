@@ -28,6 +28,25 @@ npm run build    # 타입 체크 + 프로덕션 빌드(dist/)
 > 공유 시: 받는 사람이 `npm install && npm run dev`만 하면 로컬에서 바로 실행됩니다.
 > 입력 JSON은 외부로 전송되지 않고 브라우저 안에서만 처리됩니다.
 
+### 프로젝트 구조
+
+```
+src/
+  lib/                 # 순수 로직 (UI·네트워크 무관, 단위 테스트 대상)
+    diff.ts              두 JSON 구조 비교
+    spec.ts              필드 명세서 생성
+    parse.ts             JSON 파싱 (JSONC 주석 허용)
+    valueType.ts         값의 JSON 타입 판별
+    export.ts            결과 → 마크다운 표 변환
+  components/
+    DiffTree.vue         변경 트리 (재귀 렌더 + 펼치기/접기)
+    SpecTable.vue        명세서 표 (펼치기/접기)
+  composables/
+    useTheme.ts          테마 상태·적용·입자 효과
+  App.vue                화면 조립 (입력·모드·결과)
+  style.css              전역 스타일 + 테마 토큰
+```
+
 ### 구현 현황
 
 **핵심 기능 (MVP)**
@@ -35,7 +54,7 @@ npm run build    # 타입 체크 + 프로덕션 빌드(dist/)
 | 기능 | 상태 | 위치 |
 |------|------|------|
 | ① 두 JSON 구조 비교 — 키 추가/삭제, 타입 변경(중첩 객체 + 배열은 요소 스키마 병합 기준) | ✅ | `src/lib/diff.ts` |
-| ② 결과 시각화 + before→after 값/타입 표시 + "변경된 것만 보기" 토글 | ✅ | `src/components/DiffTree.vue`, `src/App.vue` |
+| ② 결과 시각화 + 값/타입 표시 + 펼치기/접기 + "변경된 것만 보기" | ✅ | `src/components/DiffTree.vue` |
 | ③ JSON 유효성 검사(빈/깨진 입력 안내, `//`·`/* */` 주석 허용) | ✅ | `src/lib/parse.ts` |
 
 **추가 구현**
@@ -44,11 +63,11 @@ npm run build    # 타입 체크 + 프로덕션 빌드(dist/)
 |------|------|------|
 | 모드 전환(비교 / 명세서) — 명세서 모드는 단일 JSON 입력 | ✅ | `src/App.vue` |
 | 모드별 예시 5종 칩(비교: 변경 전/후 쌍, 명세서: 단일 JSON) | ✅ | `src/App.vue` |
-| 필드 명세서 자동 생성(구조 → 경로·타입·예시, 들여쓰기 트리, 배열은 `array` 표기) | ✅ | `src/lib/spec.ts` |
+| 필드 명세서 자동 생성 + 표 펼치기/접기(구조 → 경로·타입·예시, 들여쓰기 트리, 배열은 `array`) | ✅ | `src/lib/spec.ts`, `src/components/SpecTable.vue` |
 | 결과 내보내기(변경 사항/명세서를 마크다운 표로 클립보드 복사) | ✅ | `src/lib/export.ts`, `src/App.vue` |
 | 결과 영역 탭 전환(변경 사항 / 명세서, 밑줄 강조) | ✅ | `src/App.vue` |
 | 다양한 예시 5종(프로필·상품·설정·결제·타입변경) 칩 선택 | ✅ | `src/App.vue` |
-| 테마 4종(라이트·다크·공주님·왕자님) + 반짝이·하트/별 비·마법봉 커서 | ✅ | `src/style.css`, `src/App.vue` |
+| 테마 4종(라이트·다크·공주님·왕자님) + 반짝이·하트/별 비·마법봉 커서 | ✅ | `src/composables/useTheme.ts`, `src/style.css` |
 | 값 타입 판별 유틸 | ✅ | `src/lib/valueType.ts` |
 
 **테스트 / 추후**

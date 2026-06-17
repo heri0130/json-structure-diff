@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { ref, computed, watchEffect } from 'vue'
+import { ref, computed } from 'vue'
 import { parseJsonInput } from './lib/parse'
 import { diffJson, type DiffResult } from './lib/diff'
 import { generateSpec, type SpecField } from './lib/spec'
 import { diffToMarkdown, specToMarkdown } from './lib/export'
+import { useTheme } from './composables/useTheme'
 import DiffTree from './components/DiffTree.vue'
+import SpecTable from './components/SpecTable.vue'
 
-type Theme = 'light' | 'dark' | 'princess' | 'prince'
 type Tab = 'diff' | 'spec'
 type Mode = 'compare' | 'spec'
+
+const { theme, rainItems, showRain } = useTheme()
 
 const oldText = ref('')
 const newText = ref('')
@@ -27,36 +30,6 @@ const hasResult = computed(() =>
 )
 const showDiffPanel = computed(() => mode.value === 'compare' && activeTab.value === 'diff')
 const showSpecPanel = computed(() => mode.value === 'spec' || activeTab.value === 'spec')
-
-// 테마 — localStorage 에 저장해 새로고침 후에도 유지
-const theme = ref<Theme>('light')
-const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('jsd-theme') : null
-if (stored === 'light' || stored === 'dark' || stored === 'princess') theme.value = stored
-watchEffect(() => {
-  document.documentElement.setAttribute('data-theme', theme.value)
-  try {
-    localStorage.setItem('jsd-theme', theme.value)
-  } catch {
-    /* 비공개 모드 등에서 저장 실패해도 무시 */
-  }
-})
-
-// 공주님(하트)·왕자님(별) 모드의 떨어지는 입자 — 위치/속도/크기를 결정적 값으로 분산
-const HEART_ICONS = ['💖', '💕', '💗', '💓', '🩷']
-// 🌠(별똥별)는 어두운 하늘 배경이 포함돼 까만 사각형처럼 보여 제외
-const STAR_ICONS = ['⭐', '✨', '🌟', '💫']
-const rainItems = computed(() => {
-  const icons = theme.value === 'prince' ? STAR_ICONS : HEART_ICONS
-  return Array.from({ length: 18 }, (_, i) => ({
-    icon: icons[i % icons.length],
-    style: {
-      left: `${(i * 5.5 + (i % 4) * 6) % 100}%`,
-      animationDuration: `${5 + (i % 5)}s`,
-      animationDelay: `${(i % 9) * 0.7}s`,
-      fontSize: `${12 + (i % 5) * 3}px`,
-    },
-  }))
-})
 
 // 다양한 도메인의 변경 전/후 예시 — 중첩·배열·객체배열·타입변경 등 서로 다른 특성
 interface Example {
@@ -297,6 +270,9 @@ function loadSpecSample(index: number) {
 function switchMode(next: Mode) {
   if (mode.value === next) return
   mode.value = next
+  // 모드를 바꾸면 입력·결과를 모두 초기화한다.
+  oldText.value = ''
+  newText.value = ''
   result.value = null
   specFields.value = []
   error.value = ''
@@ -335,7 +311,7 @@ function reset() {
   <div class="app">
     <!-- 공주님: 하트 비 / 왕자님: 별 비 -->
     <div
-      v-if="theme === 'princess' || theme === 'prince'"
+      v-if="showRain"
       class="sky-rain"
       :class="theme === 'prince' ? 'rain-prince' : 'rain-princess'"
       aria-hidden="true"
@@ -524,32 +500,7 @@ function reset() {
         <!-- 명세서 (비교 모드의 명세서 탭 또는 명세서 모드) -->
         <div v-if="showSpecPanel" class="tab-panel">
           <p v-if="specFields.length === 0" class="no-diff">표시할 필드가 없습니다.</p>
-          <div v-else class="spec-wrap">
-            <table class="spec">
-              <thead>
-                <tr>
-                  <th>필드</th>
-                  <th>타입</th>
-                  <th>예시값</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="f in specFields" :key="f.path" :class="{ 'is-child': f.depth > 0 }">
-                  <td class="spec-path">
-                    <span
-                      class="indent"
-                      :style="{ width: f.depth * 18 + 'px' }"
-                      aria-hidden="true"
-                    ></span>
-                    <span v-if="f.depth > 0" class="branch" aria-hidden="true">└</span>
-                    <span class="field-name">{{ f.name }}</span>
-                  </td>
-                  <td><span class="type-chip">{{ f.type }}</span></td>
-                  <td class="spec-ex">{{ f.example }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <SpecTable v-else :fields="specFields" />
         </div>
       </section>
 
@@ -1104,73 +1055,6 @@ textarea::placeholder {
   margin: 0;
   padding: 10px 18px 16px;
   list-style: none;
-}
-
-/* ── 명세서 표 ── */
-.spec-wrap {
-  overflow-x: auto;
-}
-.spec {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.spec th {
-  text-align: left;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-muted);
-  padding: 10px 18px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
-  white-space: nowrap;
-}
-.spec td {
-  padding: 9px 18px;
-  border-bottom: 1px solid var(--border);
-  vertical-align: top;
-}
-.spec tbody tr:last-child td {
-  border-bottom: 0;
-}
-.spec tbody tr:hover {
-  background: var(--surface-2);
-}
-.spec-path {
-  font-family: var(--mono);
-  white-space: nowrap;
-}
-.spec-path .indent {
-  display: inline-block;
-  flex: none;
-}
-.spec-path .branch {
-  color: var(--text-subtle);
-  margin-right: 5px;
-}
-.spec-path .field-name {
-  font-weight: 600;
-  color: var(--text);
-}
-/* 하위 필드(자식)는 이름을 살짝 옅게 해 부모와 위계 구분 */
-.is-child .field-name {
-  font-weight: 500;
-  color: var(--text-muted);
-}
-.spec-ex {
-  font-family: var(--mono);
-  color: var(--text-muted);
-}
-.type-chip {
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--brand);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 1px 7px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
 }
 
 /* ── 빈 상태 ── */

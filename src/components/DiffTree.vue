@@ -1,16 +1,19 @@
 <script setup lang="ts">
 // 차이 노드 하나와 그 하위를 재귀로 렌더링한다.
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import type { DiffNode } from '../lib/diff'
 import { valueType } from '../lib/valueType'
 
 const props = defineProps<{ node: DiffNode; changedOnly?: boolean }>()
+
+const expanded = ref(true) // 하위 트리 펼침 상태
 
 // 변경된 것만 보기: unchanged 노드(=하위까지 변화 없는 서브트리)는 숨긴다.
 const visibleChildren = computed(() => {
   const children = props.node.children ?? []
   return props.changedOnly ? children.filter((c) => c.status !== 'unchanged') : children
 })
+const hasChildren = computed(() => visibleChildren.value.length > 0)
 
 const STATUS_LABEL: Record<DiffNode['status'], string> = {
   added: '추가',
@@ -28,6 +31,15 @@ function preview(value: unknown): string {
 
 <template>
   <li :class="['node', node.status]">
+    <button
+      v-if="hasChildren"
+      class="caret"
+      :aria-label="expanded ? '접기' : '펼치기'"
+      @click="expanded = !expanded"
+    >
+      {{ expanded ? '▼' : '▶' }}
+    </button>
+    <span v-else class="caret-ph" aria-hidden="true"></span>
     <span class="badge">{{ STATUS_LABEL[node.status] }}</span>
     <span class="key">{{ node.key || 'data' }}</span>
 
@@ -55,7 +67,7 @@ function preview(value: unknown): string {
       </span>
     </template>
 
-    <ul v-if="visibleChildren.length" class="children">
+    <ul v-if="hasChildren && expanded" class="children">
       <DiffTree
         v-for="child in visibleChildren"
         :key="child.path"
@@ -89,6 +101,23 @@ function preview(value: unknown): string {
   margin: 0;
   padding-left: 18px;
   border-left: 1px solid var(--border);
+}
+.caret {
+  border: 0;
+  background: transparent;
+  color: var(--text-subtle);
+  font-size: 9px;
+  width: 16px;
+  padding: 0;
+  margin-right: 2px;
+  vertical-align: middle;
+}
+.caret:hover {
+  color: var(--brand);
+}
+.caret-ph {
+  display: inline-block;
+  width: 18px;
 }
 .badge {
   display: inline-block;
