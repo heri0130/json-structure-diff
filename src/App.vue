@@ -152,6 +152,89 @@ const EXAMPLES: Example[] = [
   },
 ]
 
+// 명세서 모드용 단일 JSON 예시 (다양한 실무 응답 구조)
+const SPEC_EXAMPLES: { label: string; json: string }[] = [
+  {
+    label: '👤 사용자 프로필',
+    json: `{
+  "id": 1001,
+  "name": "김한빛",
+  "email": "kim@example.com",
+  "age": 30,
+  "isActive": true,
+  "roles": ["user", "admin"],
+  "profile": {
+    "nickname": "빛돌이",
+    "avatarUrl": "https://example.com/a.png"
+  }
+}`,
+  },
+  {
+    // 주석(//) 포함 — JSONC 허용 동작도 함께 확인 가능
+    label: '💳 결제 응답',
+    json: `{
+  "paymentKey": "tjGJRym_924o8gBJqj1kg",
+  "status": "DONE",
+  "method": "간편결제",
+  "orderName": "토스 티셔츠 외 2건",
+  // 카드 정보
+  "card": {
+    "number": "123456******7890",
+    "installmentPlanMonths": 0,
+    "isInterestFree": false,
+    "interestPayer": null,
+    "cardType": "신용",
+    "amount": 15000
+  },
+  "easyPay": {
+    "provider": "토스페이",
+    "amount": 0
+  },
+  "totalAmount": 15000
+}`,
+  },
+  {
+    label: '📋 목록/페이징',
+    json: `{
+  "page": 1,
+  "size": 20,
+  "totalElements": 135,
+  "totalPages": 7,
+  "content": [
+    { "id": 1, "title": "공지사항", "views": 1024 },
+    { "id": 2, "title": "이벤트 안내", "views": 512 }
+  ]
+}`,
+  },
+  {
+    label: '🛒 상품 상세',
+    json: `{
+  "productId": "P-2024",
+  "name": "무선 키보드",
+  "price": 49000,
+  "inStock": true,
+  "options": [
+    { "color": "블랙", "stock": 12 },
+    { "color": "화이트", "stock": 0 }
+  ],
+  "tags": ["사무용", "블루투스"]
+}`,
+  },
+  {
+    label: '⚙️ 설정',
+    json: `{
+  "theme": "dark",
+  "language": "ko",
+  "notifications": {
+    "email": true,
+    "push": false,
+    "sms": false
+  },
+  "limits": { "maxUpload": 10485760, "maxItems": 100 }
+}`,
+  },
+]
+
 const totalChanges = computed(() => {
   if (!result.value) return 0
   const s = result.value.summary
@@ -203,6 +286,14 @@ function buildSpec() {
   specFields.value = generateSpec(parsed.value)
 }
 
+function loadSpecSample(index: number) {
+  newText.value = SPEC_EXAMPLES[index].json
+  selectedExample.value = index
+  error.value = ''
+  result.value = null
+  specFields.value = []
+}
+
 function switchMode(next: Mode) {
   if (mode.value === next) return
   mode.value = next
@@ -210,6 +301,7 @@ function switchMode(next: Mode) {
   specFields.value = []
   error.value = ''
   activeTab.value = 'diff'
+  selectedExample.value = null
 }
 
 async function copyResult() {
@@ -321,6 +413,18 @@ function reset() {
           class="ex-chip"
           :class="{ active: selectedExample === i }"
           @click="loadSample(i)"
+        >
+          {{ ex.label }}
+        </button>
+      </div>
+      <div v-else class="examples">
+        <span class="ex-label">예시 불러오기</span>
+        <button
+          v-for="(ex, i) in SPEC_EXAMPLES"
+          :key="i"
+          class="ex-chip"
+          :class="{ active: selectedExample === i }"
+          @click="loadSpecSample(i)"
         >
           {{ ex.label }}
         </button>
@@ -441,7 +545,7 @@ function reset() {
                     <span class="field-name">{{ f.name }}</span>
                   </td>
                   <td><span class="type-chip">{{ f.type }}</span></td>
-                  <td class="spec-ex">{{ f.example || '—' }}</td>
+                  <td class="spec-ex">{{ f.example }}</td>
                 </tr>
               </tbody>
             </table>

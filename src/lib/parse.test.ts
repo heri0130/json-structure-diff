@@ -19,4 +19,22 @@ describe('parseJsonInput', () => {
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.message).toContain('변경 전')
   })
+
+  it('// 라인 주석을 무시하고 파싱한다', () => {
+    const r = parseJsonInput('{\n  "a": 1, // 설명\n  "b": 2\n  //...\n}')
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.value).toEqual({ a: 1, b: 2 })
+  })
+
+  it('/* */ 블록 주석을 무시한다', () => {
+    const r = parseJsonInput('{ /* 메모 */ "a": 1 }')
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.value).toEqual({ a: 1 })
+  })
+
+  it('문자열 안의 // 는 주석으로 보지 않고 보존한다', () => {
+    const r = parseJsonInput('{ "url": "http://example.com/x" }')
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.value).toEqual({ url: 'http://example.com/x' })
+  })
 })
