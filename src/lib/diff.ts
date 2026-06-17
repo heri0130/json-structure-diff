@@ -43,6 +43,36 @@ function isEqual(a: unknown, b: unknown): boolean {
 
 const SENTINEL = Symbol('absent') // 한쪽에만 키가 있는 경우를 구분하기 위한 표식
 
+/**
+ * 한쪽에만 존재하는 값(추가 또는 삭제)을 표시용 자식 트리로 펼친다.
+ * 요약 카운트에는 포함하지 않는다 — 추가/삭제는 최상위 1건으로만 집계한다.
+ */
+function buildSubtree(value: unknown, path: string, status: 'added' | 'removed'): DiffNode[] | undefined {
+  if (isPlainObject(value)) {
+    return Object.keys(value).map((k) =>
+      oneSidedNode(k, path ? `${path}.${k}` : k, value[k], status),
+    )
+  }
+  if (Array.isArray(value)) {
+    return value.map((v, i) => oneSidedNode(`[${i}]`, `${path}[${i}]`, v, status))
+  }
+  return undefined
+}
+
+function oneSidedNode(
+  key: string,
+  path: string,
+  value: unknown,
+  status: 'added' | 'removed',
+): DiffNode {
+  const node: DiffNode = { key, path, status }
+  if (status === 'added') node.newValue = value
+  else node.oldValue = value
+  const children = buildSubtree(value, path, status)
+  if (children) node.children = children
+  return node
+}
+
 function diffNode(
   key: string,
   path: string,
@@ -50,14 +80,14 @@ function diffNode(
   newValue: unknown,
   summary: DiffSummary,
 ): DiffNode {
-  // 한쪽에만 존재 → added / removed
+  // 한쪽에만 존재 → added / removed. 값이 객체/배열이면 내부를 자식으로 펼친다.
   if (oldValue === SENTINEL) {
     summary.added++
-    return { key, path, status: 'added', newValue }
+    return oneSidedNode(key, path, newValue, 'added')
   }
   if (newValue === SENTINEL) {
     summary.removed++
-    return { key, path, status: 'removed', oldValue }
+    return oneSidedNode(key, path, oldValue, 'removed')
   }
 
   // 양쪽 다 배열 → 인덱스 단위로 재귀 비교. 길이가 다르면 남는 인덱스는 added/removed.

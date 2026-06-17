@@ -22,7 +22,7 @@ function preview(value: unknown): string {
 <template>
   <li :class="['node', node.status]">
     <span class="badge">{{ STATUS_LABEL[node.status] }}</span>
-    <span class="key">{{ node.key || '(root)' }}</span>
+    <span class="key">{{ node.key || 'data' }}</span>
 
     <!-- 잎 노드(자식 없음)일 때만 값을 보여준다 -->
     <template v-if="!node.children">
@@ -57,51 +57,68 @@ function preview(value: unknown): string {
 <style scoped>
 .node {
   list-style: none;
-  padding: 2px 0;
-  font-family: 'Cascadia Code', 'D2Coding', Consolas, monospace;
+  padding: 3px 8px;
+  margin: 1px 0;
+  border-radius: 6px;
+  font-family: var(--mono);
   font-size: 13px;
+  line-height: 1.7;
+  transition: background 0.1s ease;
 }
+.node:hover {
+  background: var(--surface-2);
+}
+/* 변경된 행은 좌측에 상태색 띠 */
+.node.added { box-shadow: inset 3px 0 0 var(--added); }
+.node.removed { box-shadow: inset 3px 0 0 var(--removed); }
+.node.changed { box-shadow: inset 3px 0 0 var(--changed); }
+
 .children {
   margin: 0;
   padding-left: 18px;
-  border-left: 1px dashed #d0d7de;
+  border-left: 1px solid var(--border);
 }
 .badge {
   display: inline-block;
-  min-width: 34px;
+  min-width: 36px;
   text-align: center;
-  font-size: 11px;
-  padding: 0 4px;
-  border-radius: 4px;
-  margin-right: 6px;
-  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  margin-right: 8px;
+  vertical-align: middle;
 }
-.added > .badge { background: #1a7f37; }
-.removed > .badge { background: #cf222e; }
-.changed > .badge { background: #bf8700; }
-.unchanged > .badge { background: #6e7781; }
+.added > .badge { color: var(--added); background: var(--added-bg); }
+.removed > .badge { color: var(--removed); background: var(--removed-bg); }
+.changed > .badge { color: var(--changed); background: var(--changed-bg); }
+.unchanged > .badge { color: var(--text-subtle); background: var(--surface-2); }
 
-.key { font-weight: 600; }
+.key { font-weight: 600; color: var(--text); }
 .val { margin-left: 8px; }
-.old { color: #cf222e; text-decoration: line-through; }
-.new { color: #1a7f37; }
-.arrow { color: #6e7781; }
-.muted { color: #6e7781; }
+.old { color: var(--removed); text-decoration: line-through; opacity: 0.85; }
+.new { color: var(--added); }
+.arrow { color: var(--text-subtle); margin: 0 2px; }
+.muted { color: var(--text-muted); }
 
 /* 값 옆 타입 칩 */
 .type {
-  margin-left: 4px;
-  font-size: 10px;
-  color: #57606a;
-  background: #eaeef2;
+  margin-left: 5px;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 0 4px;
+  padding: 0 5px;
   vertical-align: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 /* 변경 전/후 타입이 다르면 강조 */
 .type.typechanged {
-  color: #9a6700;
-  background: #fff8c5;
-  font-weight: 600;
+  color: var(--changed);
+  background: var(--changed-bg);
+  border-color: transparent;
 }
 </style>

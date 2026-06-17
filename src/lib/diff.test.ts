@@ -91,4 +91,22 @@ describe('diffJson', () => {
   it('배열 ↔ 비배열 타입 변경은 changed', () => {
     expect(findByPath(diffJson({ a: [1] }, { a: 'x' }).root, 'a')?.status).toBe('changed')
   })
+
+  it('객체가 통째로 추가되면 내부를 자식으로 펼친다 (요약은 1건)', () => {
+    const { root, summary } = diffJson({}, { item: { id: 3, name: '배송' } })
+    const item = findByPath(root, 'item')
+    expect(item?.status).toBe('added')
+    expect(item?.children?.length).toBe(2)
+    expect(findByPath(root, 'item.id')?.status).toBe('added')
+    expect(findByPath(root, 'item.id')?.newValue).toBe(3)
+    expect(summary.added).toBe(1) // 펼쳐도 추가는 1건으로 집계
+  })
+
+  it('배열이 통째로 삭제되면 요소를 자식으로 펼친다', () => {
+    const { root } = diffJson({ list: [{ id: 1 }] }, {})
+    const list = findByPath(root, 'list')
+    expect(list?.status).toBe('removed')
+    expect(findByPath(root, 'list[0]')?.status).toBe('removed')
+    expect(findByPath(root, 'list[0].id')?.status).toBe('removed')
+  })
 })

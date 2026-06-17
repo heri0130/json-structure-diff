@@ -1,7 +1,40 @@
 :root {
-  font-family: system-ui, 'Segoe UI', sans-serif;
-  color: #1f2328;
-  background: #f6f8fa;
+  /* 색 토큰 */
+  --bg: #f1f5f9;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-subtle: #94a3b8;
+
+  --brand: #4f46e5;
+  --brand-strong: #4338ca;
+
+  --added: #16a34a;
+  --added-bg: #dcfce7;
+  --removed: #dc2626;
+  --removed-bg: #fee2e2;
+  --changed: #d97706;
+  --changed-bg: #fef3c7;
+
+  /* 모양 */
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
+
+  --font: system-ui, -apple-system, 'Segoe UI', 'Malgun Gothic', sans-serif;
+  --mono: ui-monospace, 'Cascadia Code', 'D2Coding', Consolas, monospace;
+
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -10,10 +43,14 @@
 
 body {
   margin: 0;
-  padding: 0;
+  min-height: 100vh;
 }
 
 button {
   font: inherit;
   cursor: pointer;
+}
+
+textarea {
+  font-family: var(--mono);
 }
