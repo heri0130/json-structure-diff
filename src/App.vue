@@ -1,13 +1,49 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watchEffect } from 'vue'
 import { parseJsonInput } from './lib/parse'
 import { diffJson, type DiffResult } from './lib/diff'
+import { generateSpec, type SpecField } from './lib/spec'
 import DiffTree from './components/DiffTree.vue'
+
+type Theme = 'light' | 'dark' | 'princess' | 'prince'
+type View = 'none' | 'diff' | 'spec'
 
 const oldText = ref('')
 const newText = ref('')
 const error = ref('')
 const result = ref<DiffResult | null>(null)
+const specFields = ref<SpecField[]>([])
+const view = ref<View>('none')
+
+// 테마 — localStorage 에 저장해 새로고침 후에도 유지
+const theme = ref<Theme>('light')
+const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('jsd-theme') : null
+if (stored === 'light' || stored === 'dark' || stored === 'princess') theme.value = stored
+watchEffect(() => {
+  document.documentElement.setAttribute('data-theme', theme.value)
+  try {
+    localStorage.setItem('jsd-theme', theme.value)
+  } catch {
+    /* 비공개 모드 등에서 저장 실패해도 무시 */
+  }
+})
+
+// 공주님(하트)·왕자님(별) 모드의 떨어지는 입자 — 위치/속도/크기를 결정적 값으로 분산
+const HEART_ICONS = ['💖', '💕', '💗', '💓', '🩷']
+// 🌠(별똥별)는 어두운 하늘 배경이 포함돼 까만 사각형처럼 보여 제외
+const STAR_ICONS = ['⭐', '✨', '🌟', '💫']
+const rainItems = computed(() => {
+  const icons = theme.value === 'prince' ? STAR_ICONS : HEART_ICONS
+  return Array.from({ length: 18 }, (_, i) => ({
+    icon: icons[i % icons.length],
+    style: {
+      left: `${(i * 5.5 + (i % 4) * 6) % 100}%`,
+      animationDuration: `${5 + (i % 5)}s`,
+      animationDelay: `${(i % 9) * 0.7}s`,
+      fontSize: `${12 + (i % 5) * 3}px`,
+    },
+  }))
+})
 
 const SAMPLE_OLD = `{
   "user": { "name": "kim", "age": 30 },
@@ -29,7 +65,6 @@ const SAMPLE_NEW = `{
   "active": false
 }`
 
-// 변경 건수 합계 — 결과 헤더에서 "차이 없음" 안내를 띄울지 판단
 const totalChanges = computed(() => {
   if (!result.value) return 0
   const s = result.value.summary
@@ -51,6 +86,19 @@ function compare() {
     return
   }
   result.value = diffJson(oldParsed.value, newParsed.value)
+  view.value = 'diff'
+}
+
+function showSpec() {
+  error.value = ''
+  // 명세서는 "변경 후" JSON 구조를 기준으로 생성한다.
+  const parsed = parseJsonInput(newText.value, '변경 후')
+  if (!parsed.ok) {
+    error.value = parsed.message
+    return
+  }
+  specFields.value = generateSpec(parsed.value)
+  view.value = 'spec'
 }
 
 function loadSample() {
@@ -58,6 +106,7 @@ function loadSample() {
   newText.value = SAMPLE_NEW
   error.value = ''
   result.value = null
+  view.value = 'none'
 }
 
 function reset() {
@@ -65,11 +114,25 @@ function reset() {
   newText.value = ''
   error.value = ''
   result.value = null
+  specFields.value = []
+  view.value = 'none'
 }
 </script>
 
 <template>
   <div class="app">
+    <!-- 공주님: 하트 비 / 왕자님: 별 비 -->
+    <div
+      v-if="theme === 'princess' || theme === 'prince'"
+      class="sky-rain"
+      :class="theme === 'prince' ? 'rain-prince' : 'rain-princess'"
+      aria-hidden="true"
+    >
+      <span v-for="(it, i) in rainItems" :key="i" class="rain-drop" :style="it.style">{{
+        it.icon
+      }}</span>
+    </div>
+
     <header class="appbar">
       <div class="appbar-inner">
         <div class="brand">
@@ -89,9 +152,30 @@ function reset() {
             <p>두 JSON의 추가·삭제·변경을 한눈에</p>
           </div>
         </div>
-        <span class="secure-badge" title="모든 처리는 브라우저 안에서만 이뤄집니다">
-          <span class="dot"></span> 로컬 처리 · 외부 전송 없음
-        </span>
+
+        <div class="appbar-right">
+          <span class="secure-badge" title="모든 처리는 브라우저 안에서만 이뤄집니다">
+            <span class="dot"></span> 로컬 처리 · 외부 전송 없음
+          </span>
+          <div class="theme-switch" role="group" aria-label="테마 선택">
+            <button :class="{ active: theme === 'light' }" title="라이트" @click="theme = 'light'">
+              ☀️
+            </button>
+            <button :class="{ active: theme === 'dark' }" title="다크" @click="theme = 'dark'">
+              🌙
+            </button>
+            <button
+              :class="{ active: theme === 'princess' }"
+              title="공주님"
+              @click="theme = 'princess'"
+            >
+              👸
+            </button>
+            <button :class="{ active: theme === 'prince' }" title="왕자님" @click="theme = 'prince'">
+              🤴
+            </button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -128,13 +212,13 @@ function reset() {
         </button>
         <button class="btn ghost" @click="loadSample">예시 넣기</button>
         <button class="btn ghost" @click="reset">초기화</button>
+        <button class="btn outline" @click="showSpec">명세서</button>
       </div>
 
-      <p v-if="error" class="error" role="alert">
-        <strong>입력 오류</strong> {{ error }}
-      </p>
+      <p v-if="error" class="error" role="alert"><strong>입력 오류</strong> {{ error }}</p>
 
-      <section v-if="result" class="result">
+      <!-- 비교 결과 -->
+      <section v-if="view === 'diff' && result" class="result">
         <div class="result-head">
           <h2>변경 요약</h2>
           <div class="summary">
@@ -149,6 +233,34 @@ function reset() {
         </ul>
       </section>
 
+      <!-- 명세서 -->
+      <section v-else-if="view === 'spec'" class="result">
+        <div class="result-head">
+          <h2>명세서</h2>
+          <span class="head-note">변경 후 JSON 구조 기준 · 필드 {{ specFields.length }}개</span>
+        </div>
+        <p v-if="specFields.length === 0" class="no-diff">표시할 필드가 없습니다.</p>
+        <div v-else class="spec-wrap">
+          <table class="spec">
+            <thead>
+              <tr>
+                <th>필드 경로</th>
+                <th>타입</th>
+                <th>예시값</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="f in specFields" :key="f.path">
+                <td class="spec-path">{{ f.path }}</td>
+                <td><span class="type-chip">{{ f.type }}</span></td>
+                <td class="spec-ex">{{ f.example || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 빈 상태 -->
       <section v-else-if="!error" class="empty">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path
@@ -158,8 +270,11 @@ function reset() {
             stroke-linecap="round"
           />
         </svg>
-        <p class="empty-title">아직 비교 결과가 없어요</p>
-        <p class="empty-sub">두 JSON을 붙여넣고 <b>비교하기</b>를 누르거나, <b>예시 넣기</b>로 시작해 보세요.</p>
+        <p class="empty-title">아직 결과가 없어요</p>
+        <p class="empty-sub">
+          두 JSON을 넣고 <b>비교하기</b>를, 구조 명세가 필요하면 <b>명세서</b>를 눌러 보세요.
+          <br />처음이라면 <b>예시 넣기</b>로 시작하면 쉬워요.
+        </p>
       </section>
     </main>
 
@@ -176,10 +291,59 @@ function reset() {
   flex-direction: column;
 }
 
+/* ── 공주님(하트)·왕자님(별) 모드: 떨어지는 입자 ── */
+.sky-rain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 55;
+}
+.rain-drop {
+  position: absolute;
+  top: -32px;
+  will-change: transform, opacity;
+  animation-name: sky-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.rain-princess .rain-drop {
+  filter: drop-shadow(0 1px 1px rgba(219, 39, 119, 0.35));
+}
+.rain-prince .rain-drop {
+  filter: drop-shadow(0 1px 2px rgba(37, 99, 235, 0.45));
+}
+@keyframes sky-fall {
+  0% {
+    transform: translateY(-32px) translateX(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(48vh) translateX(14px) rotate(20deg);
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(104vh) translateX(-6px) rotate(-12deg);
+    opacity: 0;
+  }
+}
+/* 접근성: 모션 최소화 설정 시 입자 비 끄기 */
+@media (prefers-reduced-motion: reduce) {
+  .rain-drop {
+    animation: none;
+    display: none;
+  }
+}
+
 /* ── 상단 앱바 ── */
 .appbar {
-  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 60%, #4338ca 100%);
-  color: #e0e7ff;
+  background: var(--appbar-bg);
+  color: #fff;
   box-shadow: var(--shadow);
 }
 .appbar-inner {
@@ -202,7 +366,7 @@ function reset() {
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.16);
   color: #fff;
 }
 .brand-text h1 {
@@ -215,7 +379,12 @@ function reset() {
 .brand-text p {
   margin: 1px 0 0;
   font-size: 12.5px;
-  color: #c7d2fe;
+  color: rgba(255, 255, 255, 0.82);
+}
+.appbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .secure-badge {
   display: inline-flex;
@@ -225,8 +394,8 @@ function reset() {
   font-weight: 500;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   white-space: nowrap;
 }
 .secure-badge .dot {
@@ -235,6 +404,31 @@ function reset() {
   border-radius: 50%;
   background: #4ade80;
   box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.25);
+}
+.theme-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+.theme-switch button {
+  border: 0;
+  background: transparent;
+  width: 30px;
+  height: 28px;
+  border-radius: 999px;
+  font-size: 15px;
+  line-height: 1;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.theme-switch button:hover {
+  transform: scale(1.12);
+}
+.theme-switch button.active {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ── 본문 ── */
@@ -245,7 +439,6 @@ function reset() {
   margin: 0 auto;
   padding: 28px 24px 48px;
 }
-
 .panels {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -313,7 +506,7 @@ textarea::placeholder {
 }
 .panel:focus-within {
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
 }
 
 /* ── 액션 ── */
@@ -346,10 +539,7 @@ textarea::placeholder {
   border-color: transparent;
   background: linear-gradient(135deg, var(--brand) 0%, var(--brand-strong) 100%);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.32);
-}
-.btn.primary:hover {
-  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.42);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.32);
 }
 .btn.ghost {
   background: transparent;
@@ -360,6 +550,14 @@ textarea::placeholder {
   background: var(--surface);
   color: var(--text);
 }
+.btn.outline {
+  background: transparent;
+  border-color: var(--brand);
+  color: var(--brand);
+}
+.btn.outline:hover {
+  background: var(--surface);
+}
 
 /* ── 오류 ── */
 .error {
@@ -368,7 +566,7 @@ textarea::placeholder {
   align-items: baseline;
   color: var(--removed);
   background: var(--removed-bg);
-  border: 1px solid #fecaca;
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 12px 14px;
   font-size: 13px;
@@ -377,7 +575,7 @@ textarea::placeholder {
   flex-shrink: 0;
 }
 
-/* ── 결과 ── */
+/* ── 결과 / 명세서 공통 카드 ── */
 .result {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -399,6 +597,10 @@ textarea::placeholder {
   margin: 0;
   font-size: 14px;
   font-weight: 700;
+}
+.head-note {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 .summary {
   display: flex;
@@ -436,6 +638,57 @@ textarea::placeholder {
   list-style: none;
 }
 
+/* ── 명세서 표 ── */
+.spec-wrap {
+  overflow-x: auto;
+}
+.spec {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.spec th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+.spec td {
+  padding: 9px 18px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.spec tbody tr:last-child td {
+  border-bottom: 0;
+}
+.spec tbody tr:hover {
+  background: var(--surface-2);
+}
+.spec-path {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--text);
+}
+.spec-ex {
+  font-family: var(--mono);
+  color: var(--text-muted);
+}
+.type-chip {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--brand);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 /* ── 빈 상태 ── */
 .empty {
   text-align: center;
@@ -457,6 +710,7 @@ textarea::placeholder {
 .empty-sub {
   margin: 0;
   font-size: 13px;
+  line-height: 1.7;
 }
 .empty-sub b {
   color: var(--text-muted);
@@ -472,13 +726,17 @@ textarea::placeholder {
 }
 
 /* ── 반응형 ── */
-@media (max-width: 720px) {
+@media (max-width: 760px) {
   .panels {
     grid-template-columns: 1fr;
   }
   .appbar-inner {
     flex-direction: column;
     align-items: flex-start;
+  }
+  .appbar-right {
+    width: 100%;
+    justify-content: space-between;
   }
 }
 </style>

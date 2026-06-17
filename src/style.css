@@ -29,6 +29,9 @@
   --font: system-ui, -apple-system, 'Segoe UI', 'Malgun Gothic', sans-serif;
   --mono: ui-monospace, 'Cascadia Code', 'D2Coding', Consolas, monospace;
 
+  /* 앱바 배경 (테마별로 오버라이드) */
+  --appbar-bg: linear-gradient(135deg, #1e1b4b 0%, #312e81 60%, #4338ca 100%);
+
   font-family: var(--font);
   color: var(--text);
   background: var(--bg);
@@ -53,4 +56,107 @@ button {
 
 textarea {
   font-family: var(--mono);
+}
+
+/* ───────── 테마 ───────── */
+
+/* 다크 */
+[data-theme='dark'] {
+  --bg: #0b1120;
+  --surface: #1e293b;
+  --surface-2: #172033;
+  --border: #334155;
+  --border-strong: #475569;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  --brand: #6366f1;
+  --brand-strong: #818cf8;
+  --added: #4ade80;
+  --added-bg: #14532d;
+  --removed: #f87171;
+  --removed-bg: #7f1d1d;
+  --changed: #fbbf24;
+  --changed-bg: #78350f;
+  --appbar-bg: linear-gradient(135deg, #020617 0%, #1e1b4b 100%);
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* 공주님 — 핑크 + 반짝이 */
+[data-theme='princess'] {
+  --bg: #fff0f6;
+  --surface: #ffffff;
+  --surface-2: #ffe4ef;
+  --border: #fbcfe8;
+  --border-strong: #f9a8d4;
+  --text: #831843;
+  --text-muted: #be185d;
+  --text-subtle: #db2777;
+  --brand: #ec4899;
+  --brand-strong: #db2777;
+  --added: #16a34a;
+  --added-bg: #dcfce7;
+  --removed: #e11d48;
+  --removed-bg: #ffe4e6;
+  --changed: #d97706;
+  --changed-bg: #fef3c7;
+  --appbar-bg: linear-gradient(135deg, #f9a8d4 0%, #ec4899 55%, #d946ef 100%);
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* 왕자님 — 파란색 + 반짝이 */
+[data-theme='prince'] {
+  --bg: #eff6ff;
+  --surface: #ffffff;
+  --surface-2: #dbeafe;
+  --border: #bfdbfe;
+  --border-strong: #93c5fd;
+  --text: #1e3a8a;
+  --text-muted: #1d4ed8;
+  --text-subtle: #3b82f6;
+  --brand: #3b82f6;
+  --brand-strong: #2563eb;
+  --added: #16a34a;
+  --added-bg: #dcfce7;
+  --removed: #e11d48;
+  --removed-bg: #ffe4e6;
+  --changed: #d97706;
+  --changed-bg: #fef3c7;
+  --appbar-bg: linear-gradient(135deg, #60a5fa 0%, #3b82f6 55%, #2563eb 100%);
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* 공주님·왕자님 모드: 마우스 포인터를 마법봉으로 (hotspot = 별 끝 9,7) */
+[data-theme='princess'],
+[data-theme='prince'] {
+  cursor: url('/wand.svg') 9 7, auto;
+}
+[data-theme='princess'] button,
+[data-theme='prince'] button {
+  cursor: url('/wand.svg') 9 7, pointer;
+}
+
+/* 공주님·왕자님 모드 전용 반짝이 오버레이 */
+[data-theme='princess'] body::after,
+[data-theme='prince'] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  background-image:
+    radial-gradient(circle, #ffffff 0 1.4px, transparent 2px),
+    radial-gradient(circle, #ffd6ef 0 1.2px, transparent 2px),
+    radial-gradient(circle, #fff0a6 0 1px, transparent 2px);
+  background-size: 110px 110px, 150px 150px, 90px 90px;
+  background-position: 0 0, 50px 70px, 20px 30px;
+  animation: princess-twinkle 2.6s ease-in-out infinite;
+  opacity: 0.55;
+}
+@keyframes princess-twinkle {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.75; }
 }
