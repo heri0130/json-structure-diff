@@ -17,6 +17,7 @@ const specFields = ref<SpecField[]>([])
 const activeTab = ref<Tab>('diff')
 const selectedExample = ref<number | null>(null) // 현재 불러온 예시 칩 강조용
 const copied = ref(false) // 복사 완료 피드백
+const changedOnly = ref(false) // 변경된 것만 보기 토글
 
 // 테마 — localStorage 에 저장해 새로고침 후에도 유지
 const theme = ref<Theme>('light')
@@ -355,16 +356,23 @@ function reset() {
             :title="activeTab === 'diff' ? '변경 사항을 마크다운으로 복사' : '명세서를 마크다운으로 복사'"
             @click="copyResult"
           >
-            {{ copied ? '✓ 복사됨' : '⧉ 마크다운 복사' }}
+            {{ copied ? '✓ 복사됨' : '⧉ 클립보드 복사' }}
           </button>
         </div>
 
         <!-- 차이 비교 -->
         <div v-show="activeTab === 'diff'" class="tab-panel">
           <p v-if="totalChanges === 0" class="no-diff">두 JSON이 동일합니다. 차이가 없어요.</p>
-          <ul v-else class="tree">
-            <DiffTree :node="result.root" />
-          </ul>
+          <template v-else>
+            <label class="filter-toggle" :class="{ active: changedOnly }">
+              <input type="checkbox" v-model="changedOnly" />
+              <span class="switch"><span class="knob"></span></span>
+              <span class="filter-label">변경된 것만 보기</span>
+            </label>
+            <ul class="tree">
+              <DiffTree :node="result.root" :changed-only="changedOnly" />
+            </ul>
+          </template>
         </div>
 
         <!-- 명세서 -->
@@ -836,9 +844,67 @@ textarea::placeholder {
   color: var(--text-muted);
   font-size: 14px;
 }
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: 12px 18px 0;
+  padding: 6px 12px 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.filter-toggle:hover {
+  border-color: var(--border-strong);
+}
+.filter-toggle.active {
+  color: var(--brand);
+  border-color: var(--brand);
+  background: var(--surface);
+}
+/* 화면에서 숨기되 접근성 유지 */
+.filter-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.switch {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 19px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: background 0.18s ease;
+}
+.knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.25);
+  transition: transform 0.18s ease;
+}
+.filter-toggle.active .switch {
+  background: var(--brand);
+}
+.filter-toggle.active .knob {
+  transform: translateX(15px);
+}
 .tree {
   margin: 0;
-  padding: 12px 18px 16px;
+  padding: 10px 18px 16px;
   list-style: none;
 }
 

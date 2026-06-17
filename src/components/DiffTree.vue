@@ -1,9 +1,16 @@
 <script setup lang="ts">
 // 차이 노드 하나와 그 하위를 재귀로 렌더링한다.
+import { computed } from 'vue'
 import type { DiffNode } from '../lib/diff'
 import { valueType } from '../lib/valueType'
 
-defineProps<{ node: DiffNode }>()
+const props = defineProps<{ node: DiffNode; changedOnly?: boolean }>()
+
+// 변경된 것만 보기: unchanged 노드(=하위까지 변화 없는 서브트리)는 숨긴다.
+const visibleChildren = computed(() => {
+  const children = props.node.children ?? []
+  return props.changedOnly ? children.filter((c) => c.status !== 'unchanged') : children
+})
 
 const STATUS_LABEL: Record<DiffNode['status'], string> = {
   added: '추가',
@@ -48,8 +55,13 @@ function preview(value: unknown): string {
       </span>
     </template>
 
-    <ul v-if="node.children && node.children.length" class="children">
-      <DiffTree v-for="child in node.children" :key="child.path" :node="child" />
+    <ul v-if="visibleChildren.length" class="children">
+      <DiffTree
+        v-for="child in visibleChildren"
+        :key="child.path"
+        :node="child"
+        :changed-only="changedOnly"
+      />
     </ul>
   </li>
 </template>
