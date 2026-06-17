@@ -41,16 +41,17 @@ function collect(
   fields: SpecField[],
 ): void {
   if (Array.isArray(value)) {
+    // JSON 표준 타입에 맞춰 배열은 모두 'array'로 표기한다.
     const first = value.length > 0 ? value[0] : undefined
     if (first !== undefined && isPlainObject(first)) {
-      // 객체 배열: object[] 한 줄 + 첫 요소의 필드를 바로 하위로 펼친다 ([] 중간 행 없음)
-      fields.push({ path, name, depth, type: 'object[]', example: '' })
+      // 객체 배열: array 한 줄 + 첫 요소의 필드를 바로 하위로 펼친다 ([] 중간 행 없음)
+      fields.push({ path, name, depth, type: 'array', example: '' })
       for (const key of Object.keys(first)) {
         collect(first[key], key, `${path}[].${key}`, depth + 1, fields)
       }
     } else if (value.length > 0) {
-      // 원시(또는 중첩 배열) 요소: 요소타입[] 한 줄, 하위 없음
-      fields.push({ path, name, depth, type: `${valueType(first)}[]`, example: exampleOf(value) })
+      // 원시(또는 중첩 배열) 요소: array 한 줄. 요소 타입은 예시값으로 드러난다.
+      fields.push({ path, name, depth, type: 'array', example: exampleOf(value) })
     } else {
       // 빈 배열
       fields.push({ path, name, depth, type: 'array', example: '[]' })

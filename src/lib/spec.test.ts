@@ -23,15 +23,20 @@ describe('generateSpec', () => {
     })
   })
 
-  it('원시 배열은 요소타입[] 한 줄로 표기하고 하위 행을 만들지 않는다', () => {
+  it('원시 배열은 array 한 줄로 표기하고 하위 행 없이 예시값으로 내용을 보여준다', () => {
     const fields = generateSpec({ roles: ['user'] })
-    expect(find(fields, 'roles')).toMatchObject({ name: 'roles', depth: 0, type: 'string[]' })
+    expect(find(fields, 'roles')).toMatchObject({
+      name: 'roles',
+      depth: 0,
+      type: 'array',
+      example: '["user"]',
+    })
     expect(find(fields, 'roles[]')).toBeUndefined()
   })
 
-  it('객체 배열은 object[] 한 줄 + 하위 필드를 바로 펼친다 ([] 중간 행 없음)', () => {
+  it('객체 배열은 array 한 줄 + 하위 필드를 바로 펼친다 ([] 중간 행 없음)', () => {
     const fields = generateSpec({ list: [{ id: 1, name: '주문' }] })
-    expect(find(fields, 'list')).toMatchObject({ name: 'list', depth: 0, type: 'object[]' })
+    expect(find(fields, 'list')).toMatchObject({ name: 'list', depth: 0, type: 'array' })
     expect(find(fields, 'list[]')).toBeUndefined()
     expect(find(fields, 'list[].id')).toMatchObject({ name: 'id', depth: 1, type: 'number' })
     expect(find(fields, 'list[].name')).toMatchObject({ name: 'name', depth: 1, type: 'string' })

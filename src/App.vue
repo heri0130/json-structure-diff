@@ -14,6 +14,7 @@ const error = ref('')
 const result = ref<DiffResult | null>(null)
 const specFields = ref<SpecField[]>([])
 const activeTab = ref<Tab>('diff')
+const selectedExample = ref<number | null>(null) // 현재 불러온 예시 칩 강조용
 
 // 테마 — localStorage 에 저장해 새로고침 후에도 유지
 const theme = ref<Theme>('light')
@@ -45,7 +46,16 @@ const rainItems = computed(() => {
   }))
 })
 
-const SAMPLE_OLD = `{
+// 다양한 도메인의 변경 전/후 예시 — 중첩·배열·객체배열·타입변경 등 서로 다른 특성
+interface Example {
+  label: string
+  before: string
+  after: string
+}
+const EXAMPLES: Example[] = [
+  {
+    label: '👤 사용자 프로필',
+    before: `{
   "user": { "name": "kim", "age": 30 },
   "roles": ["user"],
   "list": [
@@ -53,8 +63,8 @@ const SAMPLE_OLD = `{
     { "id": 2, "name": "결제" }
   ],
   "active": true
-}`
-const SAMPLE_NEW = `{
+}`,
+    after: `{
   "user": { "name": "lee", "age": 30, "grade": "A" },
   "roles": ["user", "admin"],
   "list": [
@@ -63,7 +73,76 @@ const SAMPLE_NEW = `{
     { "id": 3, "name": "배송" }
   ],
   "active": false
-}`
+}`,
+  },
+  {
+    label: '🛒 상품',
+    before: `{
+  "id": 101,
+  "name": "무선 이어폰",
+  "price": 89000,
+  "inStock": true,
+  "tags": ["audio", "wireless"]
+}`,
+    after: `{
+  "id": 101,
+  "name": "무선 이어폰",
+  "price": 79000,
+  "inStock": false,
+  "tags": ["audio", "wireless", "sale"],
+  "rating": 4.5
+}`,
+  },
+  {
+    label: '⚙️ 설정',
+    before: `{
+  "theme": "light",
+  "notifications": { "email": true, "push": false },
+  "maxItems": 20
+}`,
+    after: `{
+  "theme": "dark",
+  "notifications": { "email": true, "push": true, "sms": false },
+  "maxItems": 50
+}`,
+  },
+  {
+    label: '🧾 결제 내역',
+    before: `{
+  "orderId": "A-1001",
+  "status": "pending",
+  "amount": 50000,
+  "items": [
+    { "name": "도서", "qty": 1 }
+  ]
+}`,
+    after: `{
+  "orderId": "A-1001",
+  "status": "paid",
+  "amount": 65000,
+  "paidAt": "2026-06-17",
+  "items": [
+    { "name": "도서", "qty": 2 },
+    { "name": "배송비", "qty": 1 }
+  ]
+}`,
+  },
+  {
+    label: '🔀 타입 변경',
+    before: `{
+  "code": 200,
+  "active": "true",
+  "data": null,
+  "scores": [10, 20]
+}`,
+    after: `{
+  "code": "200",
+  "active": true,
+  "data": { "value": 1 },
+  "scores": "N/A"
+}`,
+  },
+]
 
 const totalChanges = computed(() => {
   if (!result.value) return 0
@@ -92,9 +171,11 @@ function compare() {
   activeTab.value = 'diff'
 }
 
-function loadSample() {
-  oldText.value = SAMPLE_OLD
-  newText.value = SAMPLE_NEW
+function loadSample(index: number) {
+  const ex = EXAMPLES[index]
+  oldText.value = ex.before
+  newText.value = ex.after
+  selectedExample.value = index
   error.value = ''
   result.value = null
   specFields.value = []
@@ -104,6 +185,7 @@ function loadSample() {
 function reset() {
   oldText.value = ''
   newText.value = ''
+  selectedExample.value = null
   error.value = ''
   result.value = null
   specFields.value = []
@@ -172,6 +254,19 @@ function reset() {
     </header>
 
     <main class="container">
+      <div class="examples">
+        <span class="ex-label">예시 불러오기</span>
+        <button
+          v-for="(ex, i) in EXAMPLES"
+          :key="i"
+          class="ex-chip"
+          :class="{ active: selectedExample === i }"
+          @click="loadSample(i)"
+        >
+          {{ ex.label }}
+        </button>
+      </div>
+
       <section class="panels">
         <div class="panel">
           <div class="panel-head">
@@ -202,7 +297,6 @@ function reset() {
           </svg>
           분석하기
         </button>
-        <button class="btn ghost" @click="loadSample">예시 넣기</button>
         <button class="btn ghost" @click="reset">초기화</button>
       </div>
 
@@ -533,6 +627,44 @@ textarea::placeholder {
   margin: 18px 0;
   flex-wrap: wrap;
 }
+.examples {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.ex-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-subtle);
+  margin-right: 2px;
+}
+.ex-chip {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-muted);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: border-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+.ex-chip:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+  box-shadow: var(--shadow-sm);
+}
+.ex-chip.active {
+  border-color: transparent;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+.ex-chip.active:hover {
+  color: #fff;
+}
 .btn {
   display: inline-flex;
   align-items: center;
@@ -594,29 +726,31 @@ textarea::placeholder {
 }
 .tabs {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 12px;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 18px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
 }
 .tab {
+  position: relative;
   border: 0;
   background: transparent;
-  padding: 7px 14px;
-  border-radius: 7px;
-  font-size: 13px;
+  padding: 14px 16px;
+  margin-bottom: -1px;
+  border-bottom: 3px solid transparent;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-muted);
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: color 0.12s ease, border-color 0.12s ease;
 }
 .tab:hover {
   color: var(--text);
+  border-bottom-color: var(--border-strong);
 }
 .tab.active {
-  background: var(--surface);
   color: var(--brand);
-  box-shadow: var(--shadow-sm);
+  border-bottom-color: var(--brand);
 }
 .tab-meta {
   margin-left: auto;
