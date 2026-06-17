@@ -8,6 +8,7 @@ import DiffTree from './components/DiffTree.vue'
 
 type Theme = 'light' | 'dark' | 'princess' | 'prince'
 type Tab = 'diff' | 'spec'
+type Mode = 'compare' | 'spec'
 
 const oldText = ref('')
 const newText = ref('')
@@ -18,6 +19,14 @@ const activeTab = ref<Tab>('diff')
 const selectedExample = ref<number | null>(null) // 현재 불러온 예시 칩 강조용
 const copied = ref(false) // 복사 완료 피드백
 const changedOnly = ref(false) // 변경된 것만 보기 토글
+const mode = ref<Mode>('compare') // 비교 모드 / 명세서(단일 입력) 모드
+
+// 결과 표시 분기
+const hasResult = computed(() =>
+  mode.value === 'compare' ? result.value !== null : specFields.value.length > 0,
+)
+const showDiffPanel = computed(() => mode.value === 'compare' && activeTab.value === 'diff')
+const showSpecPanel = computed(() => mode.value === 'spec' || activeTab.value === 'spec')
 
 // 테마 — localStorage 에 저장해 새로고침 후에도 유지
 const theme = ref<Theme>('light')
@@ -181,13 +190,33 @@ function loadSample(index: number) {
   activeTab.value = 'diff'
 }
 
+// 명세서 모드: 단일 JSON 입력 → 명세서만 생성
+function buildSpec() {
+  error.value = ''
+  result.value = null
+  const parsed = parseJsonInput(newText.value, 'JSON')
+  if (!parsed.ok) {
+    specFields.value = []
+    error.value = parsed.message
+    return
+  }
+  specFields.value = generateSpec(parsed.value)
+}
+
+function switchMode(next: Mode) {
+  if (mode.value === next) return
+  mode.value = next
+  result.value = null
+  specFields.value = []
+  error.value = ''
+  activeTab.value = 'diff'
+}
+
 async function copyResult() {
-  if (!result.value) return
-  // 활성 탭 기준으로 마크다운을 만든다.
-  const md =
-    activeTab.value === 'diff'
-      ? diffToMarkdown(result.value)
-      : specToMarkdown(specFields.value)
+  // 명세서 모드이거나 명세서 탭이면 명세서를, 아니면 변경 사항을 복사한다.
+  const useSpec = mode.value === 'spec' || activeTab.value === 'spec'
+  if (!useSpec && !result.value) return
+  const md = useSpec ? specToMarkdown(specFields.value) : diffToMarkdown(result.value!)
   try {
     await navigator.clipboard.writeText(md)
     copied.value = true
@@ -239,8 +268,8 @@ function reset() {
             </svg>
           </span>
           <div class="brand-text">
-            <h1>JSON 구조 비교기</h1>
-            <p>두 JSON의 구조 변경(키 추가·삭제·타입 변경)을 한눈에</p>
+            <h1>JSON 구조 분석기</h1>
+            <p>두 JSON의 구조 변경을 비교하거나, JSON의 필드 명세서를 만듭니다</p>
           </div>
         </div>
 
@@ -271,7 +300,20 @@ function reset() {
     </header>
 
     <main class="container">
-      <div class="examples">
+      <div class="mode-switch" role="tablist" aria-label="모드 선택">
+        <button
+          class="mode-btn"
+          :class="{ active: mode === 'compare' }"
+          @click="switchMode('compare')"
+        >
+          <span class="mode-ico" aria-hidden="true">⇄</span> 비교
+        </button>
+        <button class="mode-btn" :class="{ active: mode === 'spec' }" @click="switchMode('spec')">
+          <span class="mode-ico" aria-hidden="true">▤</span> 명세서
+        </button>
+      </div>
+
+      <div v-if="mode === 'compare'" class="examples">
         <span class="ex-label">예시 불러오기</span>
         <button
           v-for="(ex, i) in EXAMPLES"
@@ -284,8 +326,8 @@ function reset() {
         </button>
       </div>
 
-      <section class="panels">
-        <div class="panel">
+      <section class="panels" :class="{ single: mode === 'spec' }">
+        <div v-if="mode === 'compare'" class="panel">
           <div class="panel-head">
             <span class="panel-label">변경 전 <span class="tag old">old</span></span>
             <span class="char-count">{{ oldText.length }}자</span>
@@ -294,7 +336,10 @@ function reset() {
         </div>
         <div class="panel">
           <div class="panel-head">
-            <span class="panel-label">변경 후 <span class="tag new">new</span></span>
+            <span class="panel-label">
+              <template v-if="mode === 'compare'">변경 후 <span class="tag new">new</span></template>
+              <template v-else>JSON 입력</template>
+            </span>
             <span class="char-count">{{ newText.length }}자</span>
           </div>
           <textarea v-model="newText" placeholder='{ "key": "value" }' spellcheck="false"></textarea>
@@ -302,7 +347,7 @@ function reset() {
       </section>
 
       <div class="actions">
-        <button class="btn primary" @click="compare">
+        <button class="btn primary" @click="mode === 'compare' ? compare() : buildSpec()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path
               d="M5 12h14M13 6l6 6-6 6"
@@ -312,53 +357,54 @@ function reset() {
               stroke-linejoin="round"
             />
           </svg>
-          분석하기
+          {{ mode === 'compare' ? '분석하기' : '명세서 만들기' }}
         </button>
         <button class="btn ghost" @click="reset">초기화</button>
       </div>
 
       <p v-if="error" class="error" role="alert"><strong>입력 오류</strong> {{ error }}</p>
 
-      <!-- 결과: 차이 비교 / 명세서 탭 전환 -->
-      <section v-if="result" class="result">
+      <!-- 결과: (비교 모드) 변경 사항/명세서 탭, (명세서 모드) 명세서만 -->
+      <section v-if="hasResult" class="result">
         <div class="tabs" role="tablist">
-          <button
-            class="tab"
-            role="tab"
-            :class="{ active: activeTab === 'diff' }"
-            @click="activeTab = 'diff'"
-          >
-            변경 사항
-          </button>
-          <button
-            class="tab"
-            role="tab"
-            :class="{ active: activeTab === 'spec' }"
-            @click="activeTab = 'spec'"
-          >
-            명세서
-          </button>
+          <template v-if="mode === 'compare'">
+            <button
+              class="tab"
+              role="tab"
+              :class="{ active: activeTab === 'diff' }"
+              @click="activeTab = 'diff'"
+            >
+              변경 사항
+            </button>
+            <button
+              class="tab"
+              role="tab"
+              :class="{ active: activeTab === 'spec' }"
+              @click="activeTab = 'spec'"
+            >
+              명세서
+            </button>
+          </template>
+          <span v-else class="result-title">명세서</span>
+
           <span class="tab-meta">
-            <template v-if="activeTab === 'diff'">
+            <template v-if="showDiffPanel && result">
               <span class="chip added">추가 {{ result.summary.added }}</span>
               <span class="chip removed">삭제 {{ result.summary.removed }}</span>
               <span class="chip changed">변경 {{ result.summary.changed }}</span>
             </template>
-            <template v-else>필드 {{ specFields.length }}개 · 변경 후 기준</template>
+            <template v-else
+              >필드 {{ specFields.length }}개{{ mode === 'compare' ? ' · 변경 후 기준' : '' }}</template
+            >
           </span>
-          <button
-            class="copy-btn"
-            :class="{ done: copied }"
-            :title="activeTab === 'diff' ? '변경 사항을 마크다운으로 복사' : '명세서를 마크다운으로 복사'"
-            @click="copyResult"
-          >
+          <button class="copy-btn" :class="{ done: copied }" title="마크다운으로 클립보드 복사" @click="copyResult">
             {{ copied ? '✓ 복사됨' : '⧉ 클립보드 복사' }}
           </button>
         </div>
 
-        <!-- 차이 비교 -->
-        <div v-show="activeTab === 'diff'" class="tab-panel">
-          <p v-if="totalChanges === 0" class="no-diff">두 JSON이 동일합니다. 차이가 없어요.</p>
+        <!-- 변경 사항 (비교 모드) -->
+        <div v-if="showDiffPanel && result" class="tab-panel">
+          <p v-if="totalChanges === 0" class="no-diff">두 JSON의 구조가 동일합니다. 변경 없음.</p>
           <template v-else>
             <label class="filter-toggle" :class="{ active: changedOnly }">
               <input type="checkbox" v-model="changedOnly" />
@@ -371,8 +417,8 @@ function reset() {
           </template>
         </div>
 
-        <!-- 명세서 -->
-        <div v-show="activeTab === 'spec'" class="tab-panel">
+        <!-- 명세서 (비교 모드의 명세서 탭 또는 명세서 모드) -->
+        <div v-if="showSpecPanel" class="tab-panel">
           <p v-if="specFields.length === 0" class="no-diff">표시할 필드가 없습니다.</p>
           <div v-else class="spec-wrap">
             <table class="spec">
@@ -582,10 +628,55 @@ function reset() {
   margin: 0 auto;
   padding: 28px 24px 48px;
 }
+.mode-switch {
+  display: flex;
+  width: 100%;
+  max-width: 420px;
+  gap: 6px;
+  margin-bottom: 20px;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.mode-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  padding: 13px 0;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-muted);
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.mode-btn .mode-ico {
+  font-size: 16px;
+  line-height: 1;
+}
+.mode-btn:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+.mode-btn.active {
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-strong) 100%);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(79, 70, 229, 0.35);
+}
+.mode-btn.active:hover {
+  color: #fff;
+}
 .panels {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+.panels.single {
+  grid-template-columns: 1fr;
 }
 .panel {
   background: var(--surface);
@@ -783,6 +874,13 @@ textarea::placeholder {
 .tab.active {
   color: var(--brand);
   border-bottom-color: var(--brand);
+}
+.result-title {
+  align-self: center;
+  padding: 13px 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
 }
 .tab-meta {
   margin-left: auto;
