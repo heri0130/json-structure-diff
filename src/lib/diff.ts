@@ -60,6 +60,25 @@ function diffNode(
     return { key, path, status: 'removed', oldValue }
   }
 
+  // 양쪽 다 배열 → 인덱스 단위로 재귀 비교. 길이가 다르면 남는 인덱스는 added/removed.
+  if (Array.isArray(oldValue) && Array.isArray(newValue)) {
+    const len = Math.max(oldValue.length, newValue.length)
+    const children: DiffNode[] = []
+    for (let i = 0; i < len; i++) {
+      children.push(
+        diffNode(
+          `[${i}]`,
+          `${path}[${i}]`,
+          i < oldValue.length ? oldValue[i] : SENTINEL,
+          i < newValue.length ? newValue[i] : SENTINEL,
+          summary,
+        ),
+      )
+    }
+    const changed = children.some((c) => c.status !== 'unchanged')
+    return { key, path, status: changed ? 'changed' : 'unchanged', oldValue, newValue, children }
+  }
+
   // 양쪽 다 객체 → 재귀 비교, 자식 중 하나라도 변하면 부모도 changed
   if (isPlainObject(oldValue) && isPlainObject(newValue)) {
     const keys = Array.from(new Set([...Object.keys(oldValue), ...Object.keys(newValue)]))

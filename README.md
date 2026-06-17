@@ -26,11 +26,10 @@ npm run build    # 타입 체크 + 프로덕션 빌드(dist/)
 
 | 기능 | 상태 | 위치 |
 |------|------|------|
-| ① 두 JSON 비교(중첩 객체, 배열 값비교) | ✅ | `src/lib/diff.ts` |
-| ② 결과 시각화 + before→after 값 표시 | ✅ | `src/components/DiffTree.vue`, `src/App.vue` |
+| ① 두 JSON 비교(중첩 객체 + 배열 인덱스 단위) | ✅ | `src/lib/diff.ts` |
+| ② 결과 시각화 + before→after 값/타입 표시 | ✅ | `src/components/DiffTree.vue`, `src/App.vue` |
 | ③ JSON 유효성 검사(빈/깨진 입력 안내) | ✅ | `src/lib/parse.ts` |
-| 단위 테스트 (비교 7 + 유효성 3) | ✅ green | `src/lib/*.test.ts` |
-| 배열 인덱스 단위 비교 | ⬜ 다음 | — |
+| 단위 테스트 (비교 12 + 유효성 3 + 타입 2) | ✅ green (17개) | `src/lib/*.test.ts` |
 | 결과 내보내기 / 이력 저장 | ⬜ 추후 | — |
 
 ---

@@ -9,8 +9,10 @@ const newText = ref('')
 const error = ref('')
 const result = ref<DiffResult | null>(null)
 
-const SAMPLE_OLD = '{\n  "user": { "name": "kim", "age": 30 },\n  "active": true\n}'
-const SAMPLE_NEW = '{\n  "user": { "name": "lee", "age": 30, "grade": "A" },\n  "active": false\n}'
+const SAMPLE_OLD =
+  '{\n  "user": { "name": "kim", "age": 30 },\n  "roles": ["user"],\n  "active": true\n}'
+const SAMPLE_NEW =
+  '{\n  "user": { "name": "lee", "age": 30, "grade": "A" },\n  "roles": ["user", "admin"],\n  "active": false\n}'
 
 function compare() {
   error.value = ''

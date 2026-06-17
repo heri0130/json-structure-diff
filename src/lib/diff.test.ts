@@ -55,10 +55,40 @@ describe('diffJson', () => {
     expect(node?.status).toBe('changed')
   })
 
-  it('배열은 MVP에서 통째 값 비교한다 (내용 같으면 unchanged)', () => {
+  it('같은 배열은 unchanged 로 본다', () => {
     expect(diffJson({ list: [1, 2] }, { list: [1, 2] }).root.status).toBe('unchanged')
-    expect(findByPath(diffJson({ list: [1, 2] }, { list: [1, 3] }).root, 'list')?.status).toBe(
-      'changed',
-    )
+  })
+
+  it('배열을 인덱스 단위로 비교한다 (요소 변경)', () => {
+    const { root } = diffJson({ list: [1, 2] }, { list: [1, 3] })
+    expect(findByPath(root, 'list')?.status).toBe('changed')
+    expect(findByPath(root, 'list[0]')?.status).toBe('unchanged')
+    const changed = findByPath(root, 'list[1]')
+    expect(changed?.status).toBe('changed')
+    expect(changed?.oldValue).toBe(2)
+    expect(changed?.newValue).toBe(3)
+  })
+
+  it('배열 길이가 늘면 추가된 요소는 added', () => {
+    const { root, summary } = diffJson({ list: [1] }, { list: [1, 2] })
+    const added = findByPath(root, 'list[1]')
+    expect(added?.status).toBe('added')
+    expect(added?.newValue).toBe(2)
+    expect(summary.added).toBe(1)
+  })
+
+  it('배열 길이가 줄면 사라진 요소는 removed', () => {
+    const { root, summary } = diffJson({ list: [1, 2] }, { list: [1] })
+    expect(findByPath(root, 'list[1]')?.status).toBe('removed')
+    expect(summary.removed).toBe(1)
+  })
+
+  it('배열 안의 객체도 재귀로 비교한다', () => {
+    const { root } = diffJson({ list: [{ a: 1 }] }, { list: [{ a: 2 }] })
+    expect(findByPath(root, 'list[0].a')?.status).toBe('changed')
+  })
+
+  it('배열 ↔ 비배열 타입 변경은 changed', () => {
+    expect(findByPath(diffJson({ a: [1] }, { a: 'x' }).root, 'a')?.status).toBe('changed')
   })
 })
