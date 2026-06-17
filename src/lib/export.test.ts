@@ -8,19 +8,17 @@ function tableRows(md: string): string[] {
 }
 
 describe('diffToMarkdown', () => {
-  it('변경 요약과 변경 행을 담고 unchanged 는 제외한다', () => {
-    const md = diffToMarkdown(diffJson({ a: 1, keep: 'x' }, { a: 2, keep: 'x', b: 3 }))
+  it('타입 변경 행을 담고 같은 타입(unchanged)은 제외한다', () => {
+    const md = diffToMarkdown(diffJson({ a: 1, keep: 'x' }, { a: '1', keep: 'y', b: 3 }))
     expect(md).toContain('변경 요약')
     const aRow = tableRows(md).find((l) => /\| a /.test(l))
-    expect(aRow).toContain('변경')
-    expect(aRow).toContain('1')
-    expect(aRow).toContain('2')
+    expect(aRow).toContain('변경') // a: number → string
     expect(tableRows(md).some((l) => l.includes('추가') && /\| b /.test(l))).toBe(true)
-    expect(md).not.toContain('keep')
+    expect(md).not.toContain('keep') // 값만 다르고 타입 같음 → 제외
   })
 
   it('요약 카운트를 포함한다', () => {
-    expect(diffToMarkdown(diffJson({ a: 1 }, { a: 2 }))).toContain('변경 1')
+    expect(diffToMarkdown(diffJson({ a: 1 }, { a: '1' }))).toContain('변경 1')
   })
 
   it('통째로 추가된 객체는 한 행으로만 나온다', () => {

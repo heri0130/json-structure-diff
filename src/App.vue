@@ -57,28 +57,21 @@ interface Example {
 }
 const EXAMPLES: Example[] = [
   {
+    // 키 추가/삭제 + 타입 변경 (값만 다른 name/roles 는 동일로 나옴)
     label: '👤 사용자 프로필',
     before: `{
   "user": { "name": "kim", "age": 30 },
   "roles": ["user"],
-  "list": [
-    { "id": 1, "name": "주문" },
-    { "id": 2, "name": "결제" }
-  ],
   "active": true
 }`,
     after: `{
-  "user": { "name": "lee", "age": 30, "grade": "A" },
+  "user": { "name": "lee", "age": "30", "grade": "A" },
   "roles": ["user", "admin"],
-  "list": [
-    { "id": 1, "name": "주문" },
-    { "id": 2, "name": "환불" },
-    { "id": 3, "name": "배송" }
-  ],
-  "active": false
+  "lastLogin": "2026-06-17"
 }`,
   },
   {
+    // 타입 변경 + 키 추가. 배열(tags) 요소 추가는 스키마 동일 → 동일로 나옴
     label: '🛒 상품',
     before: `{
   "id": 101,
@@ -90,13 +83,14 @@ const EXAMPLES: Example[] = [
     after: `{
   "id": 101,
   "name": "무선 이어폰",
-  "price": 79000,
-  "inStock": false,
+  "price": "79000",
+  "inStock": true,
   "tags": ["audio", "wireless", "sale"],
   "rating": 4.5
 }`,
   },
   {
+    // 중첩 객체 키 추가 + 타입 변경
     label: '⚙️ 설정',
     before: `{
   "theme": "light",
@@ -105,15 +99,16 @@ const EXAMPLES: Example[] = [
 }`,
     after: `{
   "theme": "dark",
-  "notifications": { "email": true, "push": true, "sms": false },
-  "maxItems": 50
+  "notifications": { "email": true, "push": false, "sms": true },
+  "maxItems": "20"
 }`,
   },
   {
+    // 타입 변경 + 키 추가 + 배열 요소 스키마에 키 추가(items[].price)
     label: '🧾 결제 내역',
     before: `{
   "orderId": "A-1001",
-  "status": "pending",
+  "status": 0,
   "amount": 50000,
   "items": [
     { "name": "도서", "qty": 1 }
@@ -122,27 +117,28 @@ const EXAMPLES: Example[] = [
     after: `{
   "orderId": "A-1001",
   "status": "paid",
-  "amount": 65000,
+  "amount": 50000,
   "paidAt": "2026-06-17",
   "items": [
-    { "name": "도서", "qty": 2 },
-    { "name": "배송비", "qty": 1 }
+    { "name": "도서", "qty": 1, "price": 15000 },
+    { "name": "배송비", "qty": 1, "price": 3000 }
   ]
 }`,
   },
   {
+    // 타입 변경 집중: number↔string, string↔boolean, null→object, number[]→string[]
     label: '🔀 타입 변경',
     before: `{
   "code": 200,
-  "active": "true",
+  "success": "true",
   "data": null,
   "scores": [10, 20]
 }`,
     after: `{
   "code": "200",
-  "active": true,
+  "success": true,
   "data": { "value": 1 },
-  "scores": "N/A"
+  "scores": ["10", "20"]
 }`,
   },
 ]
@@ -244,7 +240,7 @@ function reset() {
           </span>
           <div class="brand-text">
             <h1>JSON 구조 비교기</h1>
-            <p>두 JSON의 추가·삭제·변경을 한눈에</p>
+            <p>두 JSON의 구조 변경(키 추가·삭제·타입 변경)을 한눈에</p>
           </div>
         </div>
 

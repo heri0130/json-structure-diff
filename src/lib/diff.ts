@@ -1,7 +1,12 @@
-// JSON 구조 비교 로직 (순수 함수 — UI/네트워크와 무관, TDD 대상)
+// JSON 구조(스키마) 비교 로직 (순수 함수 — UI/네트워크와 무관, TDD 대상)
 //
-// MVP 범위: 객체 중첩까지 키 단위로 비교. 배열은 통째로 값 비교(unchanged/changed)로
-// 처리한다 — 배열 인덱스 단위 비교는 위험 요소가 커 다음 단계로 미룸(README 6.4 참고).
+// 비교 기준은 "값"이 아니라 "구조(키 + 타입)"다:
+//  - added/removed : 키가 추가/삭제됨
+//  - changed       : 같은 키인데 값의 타입이 바뀜 (예: number → string)
+//  - unchanged     : 키가 있고 타입이 같음 (값이 달라도 동일로 본다)
+// 객체는 키 단위로 재귀, 배열은 식별 키(있으면) 또는 인덱스 단위로 재귀 비교한다.
+
+import { valueType } from './valueType'
 
 export type DiffStatus = 'added' | 'removed' | 'changed' | 'unchanged'
 
@@ -30,18 +35,31 @@ export interface DiffResult {
   summary: DiffSummary
 }
 
-/** 일반 객체(배열·null 제외)인지 판별 — 배열은 MVP에서 값으로 통째 비교한다. */
+/** 일반 객체(배열·null 제외)인지 판별. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** 원시값·배열의 동등 비교. 배열/객체는 직렬화로 비교(MVP 수준이면 충분). */
-function isEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true
-  return JSON.stringify(a) === JSON.stringify(b)
-}
-
 const SENTINEL = Symbol('absent') // 한쪽에만 키가 있는 경우를 구분하기 위한 표식
+
+/**
+ * 배열 요소들을 하나의 대표 스키마로 병합한다 (구조 비교용).
+ * 요소 개수·순서·값은 무시하고, 객체 요소면 키 합집합(첫 등장 값 대표), 원시 요소면 첫 요소를 쓴다.
+ * 빈 배열은 SENTINEL(요소 없음).
+ */
+function mergeArrayElements(arr: unknown[]): unknown {
+  if (arr.length === 0) return SENTINEL
+  if (arr.every(isPlainObject)) {
+    const merged: Record<string, unknown> = {}
+    for (const el of arr as Record<string, unknown>[]) {
+      for (const k of Object.keys(el)) {
+        if (!(k in merged)) merged[k] = el[k]
+      }
+    }
+    return merged
+  }
+  return arr[0]
+}
 
 /**
  * 한쪽에만 존재하는 값(추가 또는 삭제)을 표시용 자식 트리로 펼친다.
@@ -90,23 +108,27 @@ function diffNode(
     return oneSidedNode(key, path, oldValue, 'removed')
   }
 
-  // 양쪽 다 배열 → 인덱스 단위로 재귀 비교. 길이가 다르면 남는 인덱스는 added/removed.
+  // 양쪽 다 배열 → 요소 "스키마"만 비교한다. 개수·순서·값은 무시하고,
+  // 요소들을 병합한 대표 스키마(키 합집합 + 타입)가 같으면 unchanged.
   if (Array.isArray(oldValue) && Array.isArray(newValue)) {
-    const len = Math.max(oldValue.length, newValue.length)
-    const children: DiffNode[] = []
-    for (let i = 0; i < len; i++) {
-      children.push(
-        diffNode(
-          `[${i}]`,
-          `${path}[${i}]`,
-          i < oldValue.length ? oldValue[i] : SENTINEL,
-          i < newValue.length ? newValue[i] : SENTINEL,
-          summary,
-        ),
-      )
+    if (oldValue.length === 0 && newValue.length === 0) {
+      return { key, path, status: 'unchanged', oldValue, newValue, children: [] }
     }
-    const changed = children.some((c) => c.status !== 'unchanged')
-    return { key, path, status: changed ? 'changed' : 'unchanged', oldValue, newValue, children }
+    const child = diffNode(
+      '[]',
+      `${path}[]`,
+      mergeArrayElements(oldValue),
+      mergeArrayElements(newValue),
+      summary,
+    )
+    return {
+      key,
+      path,
+      status: child.status === 'unchanged' ? 'unchanged' : 'changed',
+      oldValue,
+      newValue,
+      children: [child],
+    }
   }
 
   // 양쪽 다 객체 → 재귀 비교, 자식 중 하나라도 변하면 부모도 changed
@@ -125,8 +147,8 @@ function diffNode(
     return { key, path, status: changed ? 'changed' : 'unchanged', oldValue, newValue, children }
   }
 
-  // 그 외(원시값·배열·타입 불일치) → 값 동등 비교
-  if (isEqual(oldValue, newValue)) {
+  // 구조 비교: 타입이 같으면 (값이 달라도) unchanged, 타입이 다르면 changed
+  if (valueType(oldValue) === valueType(newValue)) {
     return { key, path, status: 'unchanged', oldValue, newValue }
   }
   summary.changed++
